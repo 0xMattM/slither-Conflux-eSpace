@@ -4,10 +4,10 @@ with open("README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
-    name="slither-analyzer",
-    description="Slither is a Solidity and Vyper static analysis framework written in Python 3.",
-    url="https://github.com/crytic/slither",
-    author="Trail of Bits",
+    name="slither-conflux-espace",
+    description="Slither con soporte para análisis de contratos en Conflux eSpace",
+    url="https://github.com/tu-usuario/slither-conflux-espace",
+    author="Tu Nombre",
     version="0.11.0",
     packages=find_packages(),
     python_requires=">=3.8",
@@ -64,6 +64,7 @@ setup(
             "slither-doctor = slither.tools.doctor.__main__:main",
             "slither-documentation = slither.tools.documentation.__main__:main",
             "slither-interface = slither.tools.interface.__main__:main",
+            "conflux-slither = slither.tools.analyze_confluxscan:main",
         ]
     },
 )
