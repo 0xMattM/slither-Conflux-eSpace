@@ -94,9 +94,9 @@ def generate_summary(json_file, summary_file):
 
     print(f"[+] Summary saved to {summary_file}")
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) != 2:
-        print(f"Usage: python {sys.argv[0]} <contract-address>")
+        print(f"Usage: conflux-slither <contract-address>")
         exit(1)
 
     address = sys.argv[1]
@@ -104,3 +104,6 @@ if __name__ == "__main__":
     json_report = run_slither_analysis(filename, address)
     summary_file = f"{address}_summary.md"
     generate_summary(json_report, summary_file)
+
+if __name__ == "__main__":
+    main()
