@@ -16,6 +16,8 @@ setup(
         "prettytable>=3.10.2",
         "pycryptodome>=3.4.6",
         "crytic-compile>=0.3.8,<0.4.0",
+        "cbor2>=5.4.0",
+
         # "crytic-compile@git+https://github.com/crytic/crytic-compile.git@master#egg=crytic-compile",
         "web3>=6.20.2, <7",
         "eth-abi>=4.0.0",
@@ -64,7 +66,7 @@ setup(
             "slither-doctor = slither.tools.doctor.__main__:main",
             "slither-documentation = slither.tools.documentation.__main__:main",
             "slither-interface = slither.tools.interface.__main__:main",
-            "conflux-slither = slither.tools.analyze_confluxscan:main",
+            "conflux-slither = slither.tools.confluxanalisis:main",
         ]
     },
 )
