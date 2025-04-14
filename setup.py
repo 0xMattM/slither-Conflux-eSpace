@@ -46,7 +46,7 @@ setup(
     long_description_content_type="text/markdown",
     entry_points={
         "console_scripts": [
-            "slither-conflux = slither.tools.conflux_espace._main_:main",
+            "slither-conflux = slither.tools.conflux_espace.__main__:main",
             "espace-source = slither.tools.conflux_espace.source_downloader:main",
         ]
     },
