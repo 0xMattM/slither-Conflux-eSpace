@@ -16,7 +16,9 @@ setup(
         "web3>=6.20.2, <7",
         "eth-abi>=4.0.0",
         "eth-typing>=3.0.0",
-        "eth-utils>=2.1.0",
+        "eth-utils>=2.1.0",    
+        "requests>=2.31.0",
+        "solc-select>=1.0.0",
     ],
     extras_require={
         "lint": [
