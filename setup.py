@@ -67,7 +67,7 @@ setup(
             "slither-documentation = slither.tools.documentation.__main__:main",
             "slither-interface = slither.tools.interface.__main__:main",
             "slither-conflux = slither.tools.conflux_espace._main_:main",
-            "espace-sourcecode = slither.tools.conflux_espace.source_downloader:main"
+            "espace-source = slither.tools.conflux_espace.source_downloader:main"
         ]
     },
 )
