@@ -13,7 +13,7 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "slither-analyzer>=0.11.0",
-        "web3>=6.20.2, <7",
+        "web3>=7.10.2, <8",
         "eth-abi>=4.0.0",
         "eth-typing>=3.0.0",
         "eth-utils>=2.1.0",    
