@@ -8,6 +8,12 @@ from importlib.metadata import distributions
 from typing import Optional, Dict, Set, Tuple
 from collections import defaultdict
 from pathlib import Path
+import locale
+
+# Forzar UTF-8 independientemente del sistema operativo
+if sys.platform.startswith('win'):
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 def install_dependencies():
     required_packages = {
@@ -73,15 +79,24 @@ def process_imports(content: str, file_path: str, project_dir: str) -> Set[str]:
             package_name = parts[0]
             relative_path = '/'.join(parts[1:])
             
-            if setup_dependency(package_name, relative_path, project_dir):
+            # Buscar en node_modules
+            node_modules_path = os.path.join(project_dir, "node_modules", import_path)
+            if os.path.exists(node_modules_path):
                 dependencies.add(package_name)
+            else:
+                if setup_dependency(package_name, relative_path, project_dir):
+                    dependencies.add(package_name)
         else:
             if import_path.startswith('./') or import_path.startswith('../'):
                 abs_import_path = os.path.normpath(
                     os.path.join(os.path.dirname(file_path), import_path)
                 )
             else:
+                # Primero intentar en el directorio de contratos
                 abs_import_path = os.path.join(project_dir, 'contracts', import_path)
+                if not os.path.exists(abs_import_path):
+                    # Si no existe, intentar en la raíz del proyecto
+                    abs_import_path = os.path.join(project_dir, import_path)
             
             os.makedirs(os.path.dirname(abs_import_path), exist_ok=True)
             
@@ -117,7 +132,7 @@ def setup_dependency(dependency: str, relative_path: str, project_dir: str) -> b
             return False
 
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, 'w') as f:
+        with open(full_path, 'w', encoding='utf-8') as f:
             f.write(content)
 
         print(f"[+] Dependency saved: {dependency}/{relative_path}")
@@ -148,7 +163,6 @@ def fetch_dependency_content(dep_info: Dict, file_path: str) -> Optional[str]:
 
 def get_source_code(address: str) -> Tuple[str, str, str, Set[str]]:
     try:
-        base_dir = os.getcwd()
         analysis_dir = f"{address}_analysis"
         contracts_dir = os.path.join(analysis_dir, "contracts")
         os.makedirs(contracts_dir, exist_ok=True)
@@ -176,55 +190,58 @@ def get_source_code(address: str) -> Tuple[str, str, str, Set[str]]:
                         if isinstance(content, dict):
                             content = content["content"]
                         
+                        # Guardar el archivo exactamente donde indica su path
+                        file_path = os.path.join(analysis_dir, path)
+                        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                        with open(file_path, "w", encoding='utf-8') as f:
+                            f.write(content)
+                        print(f"[+] Saved: {path}")
+                        
                         if path.startswith("@"):
-                            file_path = os.path.join(base_dir, path)
                             dependencies.add(path.split('/')[0])
-                            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                            with open(file_path, "w") as f:
-                                f.write(content)
-                            print(f"[+] Dependency saved: {path}")
-                        else:
-                            if path.startswith("contracts/"):
-                                path = path[len("contracts/"):]
-                            file_path = os.path.join(contracts_dir, path)
-                            if not contract_filename:
-                                contract_filename = path
-                            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                            with open(file_path, "w") as f:
-                                f.write(content)
-                            print(f"[+] Contract saved: {path}")
-                else:
-                    contract_filename = "contract.sol"
-                    contract_path = os.path.join(contracts_dir, contract_filename)
-                    with open(contract_path, "w") as f:
-                        f.write(source_code)
-                    print(f"[+] Contract saved: {contract_filename}")
+                        elif not contract_filename:
+                            contract_filename = path
             except json.JSONDecodeError:
                 contract_filename = "contract.sol"
                 contract_path = os.path.join(contracts_dir, contract_filename)
-                with open(contract_path, "w") as f:
+                with open(contract_path, "w", encoding='utf-8') as f:
                     f.write(source_code)
                 print(f"[+] Contract saved: {contract_filename}")
         else:
             contract_filename = "contract.sol"
             contract_path = os.path.join(contracts_dir, contract_filename)
-            with open(contract_path, "w") as f:
+            with open(contract_path, "w", encoding='utf-8') as f:
                 f.write(source_code)
             print(f"[+] Contract saved: {contract_filename}")
 
         if not contract_filename:
             raise Exception("Could not determine main contract file")
 
+        # Verificar y resolver dependencias faltantes
+        verify_dependencies(analysis_dir, dependencies)
+
         return analysis_dir, contracts_dir, contract_filename, dependencies
 
     except Exception as e:
         print(f"[!] Error getting source code: {e}")
-        print(f"[!] URL: {url}")
         if 'response' in locals():
             print(f"[!] Response status: {response.status_code}")
             print(f"[!] Response content: {response.text[:200]}...")
-    
-    return "", "", "", set()
+        return "", "", "", set()
+
+def verify_dependencies(project_dir: str, dependencies: Set[str]):
+    """Verifica y resuelve dependencias faltantes"""
+    for dep in dependencies:
+        node_modules_path = os.path.join(project_dir, "node_modules", dep)
+        if not os.path.exists(node_modules_path):
+            print(f"[+] Installing missing dependency: {dep}")
+            try:
+                # Intentar obtener la dependencia
+                dep_info = get_dependency_info(dep)
+                if dep_info:
+                    setup_dependency(dep, "", project_dir)
+            except Exception as e:
+                print(f"[!] Warning: Could not resolve dependency {dep}: {e}")
 
 def main():
     install_dependencies()
