@@ -8,9 +8,7 @@ from importlib.metadata import distributions
 from typing import Optional, Dict, Set, Tuple
 from collections import defaultdict
 from pathlib import Path
-import locale
 
-# Forzar UTF-8 independientemente del sistema operativo
 if sys.platform.startswith('win'):
     sys.stdout.reconfigure(encoding='utf-8')
     sys.stderr.reconfigure(encoding='utf-8')
@@ -19,9 +17,9 @@ def install_dependencies():
     required_packages = {
         'requests': 'requests'
     }
-    
+
     installed_packages = {dist.metadata['Name'] for dist in distributions()}
-    
+
     for package, command in required_packages.items():
         if package.lower() not in installed_packages:
             print(f"[+] Installing {package}...")
@@ -36,17 +34,17 @@ def get_dependency_info(dependency: str) -> Optional[Dict]:
     try:
         npm_url = f"https://registry.npmjs.org/{dependency}"
         response = requests.get(npm_url)
-        
+
         if response.status_code == 200:
             npm_data = response.json()
             versions = list(npm_data.get('versions', {}).keys())
             if not versions:
                 return None
-                
+
             versions.sort(key=lambda x: [int(y) for y in x.split('.')], reverse=True)
             repository = npm_data.get('repository', {})
             repo_url = repository.get('url', '') if isinstance(repository, dict) else str(repository)
-            
+
             github_match = re.search(r'github\.com[:/]([^/]+/[^/]+?)(\.git)?$', repo_url)
             if github_match:
                 return {
@@ -55,51 +53,51 @@ def get_dependency_info(dependency: str) -> Optional[Dict]:
                     'registry': 'npm',
                     'package': dependency
                 }
-            
+
             return {
                 'versions': versions,
                 'registry': 'npm',
                 'package': dependency
             }
-                
+
     except Exception as e:
         print(f"[!] Error fetching dependency info {dependency}: {e}")
-    
+
     return None
 
 def process_imports(content: str, file_path: str, project_dir: str) -> Set[str]:
     dependencies = set()
     import_pattern = r'import\s+(?:{[^}]+}|[^;]+)\s+from\s+["\']([^"\']+)["\']'
-    
+
     for match in re.finditer(import_pattern, content):
         import_path = match.group(1)
-        
+
         if import_path.startswith('@'):
             parts = import_path.split('/')
             package_name = parts[0]
             relative_path = '/'.join(parts[1:])
-            
-            # Buscar en node_modules
-            node_modules_path = os.path.join(project_dir, "node_modules", import_path)
-            if os.path.exists(node_modules_path):
+
+            if setup_dependency(package_name, relative_path, project_dir):
+
+
                 dependencies.add(package_name)
-            else:
-                if setup_dependency(package_name, relative_path, project_dir):
-                    dependencies.add(package_name)
+
+
+
         else:
             if import_path.startswith('./') or import_path.startswith('../'):
                 abs_import_path = os.path.normpath(
                     os.path.join(os.path.dirname(file_path), import_path)
                 )
             else:
-                # Primero intentar en el directorio de contratos
+
                 abs_import_path = os.path.join(project_dir, 'contracts', import_path)
-                if not os.path.exists(abs_import_path):
-                    # Si no existe, intentar en la raíz del proyecto
-                    abs_import_path = os.path.join(project_dir, import_path)
-            
+
+
+
+
             os.makedirs(os.path.dirname(abs_import_path), exist_ok=True)
-            
+
             if not os.path.exists(abs_import_path):
                 for dep in dependencies:
                     dep_path = os.path.join(project_dir, dep, import_path)
@@ -122,7 +120,7 @@ def setup_dependency(dependency: str, relative_path: str, project_dir: str) -> b
             return False
 
         full_path = os.path.join(project_dir, dependency, relative_path)
-        
+
         if os.path.exists(full_path):
             return True
 
@@ -163,6 +161,7 @@ def fetch_dependency_content(dep_info: Dict, file_path: str) -> Optional[str]:
 
 def get_source_code(address: str) -> Tuple[str, str, str, Set[str]]:
     try:
+        base_dir = os.getcwd()
         analysis_dir = f"{address}_analysis"
         contracts_dir = os.path.join(analysis_dir, "contracts")
         os.makedirs(contracts_dir, exist_ok=True)
@@ -189,18 +188,37 @@ def get_source_code(address: str) -> Tuple[str, str, str, Set[str]]:
                     for path, content in sources["sources"].items():
                         if isinstance(content, dict):
                             content = content["content"]
-                        
-                        # Guardar el archivo exactamente donde indica su path
-                        file_path = os.path.join(analysis_dir, path)
-                        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                        with open(file_path, "w", encoding='utf-8') as f:
-                            f.write(content)
-                        print(f"[+] Saved: {path}")
-                        
+
+
+
+
+
+
+
+
                         if path.startswith("@"):
+                            file_path = os.path.join(base_dir, path)
                             dependencies.add(path.split('/')[0])
-                        elif not contract_filename:
-                            contract_filename = path
+                            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                            with open(file_path, "w", encoding='utf-8') as f:
+                                f.write(content)
+                            print(f"[+] Dependency saved: {path}")
+                        else:
+                            if path.startswith("contracts/"):
+                                path = path[len("contracts/"):]
+                            file_path = os.path.join(contracts_dir, path)
+                            if not contract_filename:
+                                contract_filename = path
+                            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                            with open(file_path, "w", encoding='utf-8') as f:
+                                f.write(content)
+                            print(f"[+] Contract saved: {path}")
+                else:
+                    contract_filename = "contract.sol"
+                    contract_path = os.path.join(contracts_dir, contract_filename)
+                    with open(contract_path, "w", encoding='utf-8') as f:
+                        f.write(source_code)
+                    print(f"[+] Contract saved: {contract_filename}")
             except json.JSONDecodeError:
                 contract_filename = "contract.sol"
                 contract_path = os.path.join(contracts_dir, contract_filename)
@@ -217,31 +235,19 @@ def get_source_code(address: str) -> Tuple[str, str, str, Set[str]]:
         if not contract_filename:
             raise Exception("Could not determine main contract file")
 
-        # Verificar y resolver dependencias faltantes
-        verify_dependencies(analysis_dir, dependencies)
+
+
 
         return analysis_dir, contracts_dir, contract_filename, dependencies
 
     except Exception as e:
         print(f"[!] Error getting source code: {e}")
+        print(f"[!] URL: {url}")
         if 'response' in locals():
             print(f"[!] Response status: {response.status_code}")
             print(f"[!] Response content: {response.text[:200]}...")
-        return "", "", "", set()
-
-def verify_dependencies(project_dir: str, dependencies: Set[str]):
-    """Verifica y resuelve dependencias faltantes"""
-    for dep in dependencies:
-        node_modules_path = os.path.join(project_dir, "node_modules", dep)
-        if not os.path.exists(node_modules_path):
-            print(f"[+] Installing missing dependency: {dep}")
-            try:
-                # Intentar obtener la dependencia
-                dep_info = get_dependency_info(dep)
-                if dep_info:
-                    setup_dependency(dep, "", project_dir)
-            except Exception as e:
-                print(f"[!] Warning: Could not resolve dependency {dep}: {e}")
+    
+    return "", "", "", set()
 
 def main():
     install_dependencies()
@@ -263,7 +269,6 @@ def main():
             
         print(f"\n[+] Download completed successfully:")
         print(f"    - Project directory: {project_dir}")
-        print(f"    - Main contract: {contract_filename}")
         print(f"    - Dependencies found: {len(dependencies)}")
         print(f"\nYou can continue with analysis using:")
         print(f"slither {project_dir}/contracts")
